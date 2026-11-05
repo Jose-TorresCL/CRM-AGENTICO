@@ -1,0 +1,232 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  owner
+  sales
+  operations
+  crew_leader
+  finance
+  viewer
+
+  @@map("user_role")
+}
+
+enum ClientType {
+  persona_natural
+  empresa
+  condominio
+  otro
+
+  @@map("client_type")
+}
+
+enum ClientStatus {
+  activo
+  inactivo
+  bloqueado
+
+  @@map("client_status")
+}
+
+enum OpportunitySource {
+  whatsapp
+  telefono
+  instagram
+  google
+  referido
+  postventa
+  otro
+
+  @@map("opportunity_source")
+}
+
+enum ServiceType {
+  revestimiento
+  reparacion
+  mantencion
+  otro
+
+  @@map("service_type")
+}
+
+enum OpportunityStage {
+  nuevo
+  contactado
+  visita_agendada
+  cotizado
+  negociacion
+  ganado
+  perdido
+
+  @@map("opportunity_stage")
+}
+
+enum OpportunityStatus {
+  abierta
+  ganada
+  perdida
+  cancelada
+
+  @@map("opportunity_status")
+}
+
+enum ActivityType {
+  llamada
+  whatsapp
+  visita_tecnica
+  seguimiento
+  coordinacion
+  cobranza
+  incidencia
+  cambio_alcance
+  otro
+
+  @@map("activity_type")
+}
+
+enum ActivityStatus {
+  pendiente
+  en_curso
+  completada
+  cancelada
+
+  @@map("activity_status")
+}
+
+enum ActivityPriority {
+  baja
+  media
+  alta
+  critica
+
+  @@map("activity_priority")
+}
+
+model User {
+  id            String               @id @db.Uuid
+  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  roles         UserRoleAssignment[]
+  auditLogs     AuditLog[]
+  opportunities Opportunity[]        @relation("OpportunityResponsible")
+  activities    Activity[]           @relation("ActivityResponsible")
+
+  @@map("users")
+}
+
+model UserRoleAssignment {
+  userId    String   @map("user_id") @db.Uuid
+  role      UserRole
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, role])
+  @@map("user_roles")
+}
+
+model AuditLog {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id") @db.Uuid
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([entity, entityId])
+  @@map("audit_logs")
+}
+
+model Client {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nombre        String        @db.VarChar(160)
+  telefono      String?       @db.VarChar(40)
+  whatsapp      String?       @db.VarChar(40)
+  email         String?       @db.VarChar(254)
+  comuna        String?       @db.VarChar(120)
+  direccion     String?       @db.VarChar(240)
+  tipoCliente   ClientType    @map("tipo_cliente")
+  estado        ClientStatus  @default(activo)
+  notas         String?
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  opportunities Opportunity[]
+  activities    Activity[]
+
+  @@index([nombre])
+  @@index([telefono])
+  @@index([whatsapp])
+  @@index([comuna])
+  @@index([estado])
+  @@index([tipoCliente])
+  @@map("clients")
+}
+
+model Opportunity {
+  id                  String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clienteId           String            @map("cliente_id") @db.Uuid
+  origen              OpportunitySource
+  tipoServicio        ServiceType       @map("tipo_servicio")
+  comuna              String?           @db.VarChar(120)
+  etapa               OpportunityStage  @default(nuevo)
+  valorEstimado       Decimal?          @map("valor_estimado") @db.Decimal(14, 0)
+  fechaEstimadaCierre DateTime?         @map("fecha_estimada_cierre") @db.Date
+  responsableId       String            @map("responsable_id") @db.Uuid
+  motivoPerdida       String?           @map("motivo_perdida")
+  motivoCancelacion   String?           @map("motivo_cancelacion")
+  proximaAccion       String?           @map("proxima_accion")
+  fechaProximaAccion  DateTime?         @map("fecha_proxima_accion") @db.Timestamptz(6)
+  estado              OpportunityStatus @default(abierta)
+  notas               String?
+  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  cliente             Client            @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  responsable         User              @relation("OpportunityResponsible", fields: [responsableId], references: [id], onDelete: Restrict)
+  activities          Activity[]
+
+  @@index([clienteId])
+  @@index([etapa])
+  @@index([estado])
+  @@index([responsableId])
+  @@index([fechaProximaAccion])
+  @@index([origen])
+  @@index([comuna])
+  @@map("opportunities")
+}
+
+model Activity {
+  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tipo          ActivityType
+  asunto        String           @db.VarChar(180)
+  descripcion   String?
+  fechaHora     DateTime         @map("fecha_hora") @db.Timestamptz(6)
+  responsableId String           @map("responsable_id") @db.Uuid
+  estado        ActivityStatus   @default(pendiente)
+  prioridad     ActivityPriority @default(media)
+  clienteId     String           @map("cliente_id") @db.Uuid
+  oportunidadId String?          @map("oportunidad_id") @db.Uuid
+  resultado     String?
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  cliente       Client           @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  oportunidad   Opportunity?     @relation(fields: [oportunidadId], references: [id], onDelete: Restrict)
+  responsable   User             @relation("ActivityResponsible", fields: [responsableId], references: [id], onDelete: Restrict)
+
+  @@index([clienteId])
+  @@index([oportunidadId])
+  @@index([responsableId])
+  @@index([estado])
+  @@index([fechaHora])
+  @@index([tipo])
+  @@index([prioridad])
+  @@map("activities")
+}
