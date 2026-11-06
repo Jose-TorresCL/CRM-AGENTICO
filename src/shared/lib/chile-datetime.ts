@@ -77,6 +77,17 @@ export function formatDate(value: Date | null | undefined) {
   }).format(value);
 }
 
+export function formatDateOnly(value: Date | null | undefined) {
+  if (!value) {
+    return "Sin fecha";
+  }
+
+  return new Intl.DateTimeFormat("es-CL", {
+    dateStyle: "medium",
+    timeZone: "UTC",
+  }).format(value);
+}
+
 export function formatDateInput(value: Date | null | undefined) {
   return value ? value.toISOString().slice(0, 10) : "";
 }

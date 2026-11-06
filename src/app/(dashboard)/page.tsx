@@ -1,128 +1,124 @@
-import { getAuthenticatedUser } from "@/server/auth/session";
-import { requireRoles, clientReadRoles } from "@/server/auth/authorization";
-import { getCommercialDashboard } from "@/modules/dashboard/services/commercial-dashboard-service";
-import { activityPriorityLabels, activityTypeLabels, opportunityStageLabels } from "@/shared/constants/crm-labels";
-import { formatClp, formatDateTime } from "@/shared/lib/chile-datetime";
 import Link from "next/link";
+import { getCommercialDashboard } from "@/modules/dashboard/services/commercial-dashboard-service";
+import {
+  activityPriorityLabels,
+  activityTypeLabels,
+  opportunityStageLabels,
+} from "@/shared/constants/crm-labels";
+import { formatClp, formatDateTime } from "@/shared/lib/chile-datetime";
+import { clientReadRoles, requireRoles } from "@/server/auth/authorization";
 
 export default async function DashboardPage() {
-  const user = await getAuthenticatedUser();
-
-  if (!user) {
-    return null;
-  }
-
-  await requireRoles(clientReadRoles);
-  const metrics = await getCommercialDashboard();
-  const stageCounts = new Map(
-    metrics.stages.map(({ etapa, _count }) => [etapa, _count._all]),
-  );
+  const { user, roles } = await requireRoles(clientReadRoles);
+  const dashboard = await getCommercialDashboard();
+  const metrics = [
+    { label: "Oportunidades nuevas", value: String(dashboard.newOpportunities) },
+    { label: "Sin próxima acción", value: String(dashboard.opportunitiesWithoutNextAction) },
+    { label: "Valor del pipeline", value: formatClp(dashboard.pipelineValue) },
+    { label: "Actividades de hoy", value: String(dashboard.activitiesTodayCount) },
+    { label: "Actividades vencidas", value: String(dashboard.overdueActivitiesCount) },
+  ];
 
   return (
-    <section className="space-y-8">
+    <section className="space-y-6">
       <header>
-        <p className="text-sm font-medium text-blue-700">CRM Comercial</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="mt-2 text-slate-600">Hola, {user.email}. Estas son las prioridades comerciales.</p>
+        <p className="text-sm font-medium text-blue-700">Resumen comercial</p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight">Bienvenido al CRM Operativo</h1>
+        <p className="mt-2 text-sm text-slate-600">
+          {user.email ?? "Sesión autenticada"} · Roles: {roles.join(", ")}
+        </p>
       </header>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Oportunidades nuevas sin contactar" value={metrics.newOpportunities} href="/oportunidades?etapa=nuevo&estado=abierta" />
-        <MetricCard label="Oportunidades sin próxima acción" value={metrics.opportunitiesWithoutNextAction} href="/oportunidades?estado=abierta" />
-        <MetricCard label="Actividades de hoy" value={metrics.activitiesTodayCount} href="/actividades?periodo=hoy" />
-        <MetricCard label="Actividades vencidas" value={metrics.overdueActivitiesCount} href="/actividades?periodo=vencidas" />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        {metrics.map((metric) => (
+          <article className="rounded-lg border border-slate-200 bg-white p-4" key={metric.label}>
+            <p className="text-sm text-slate-600">{metric.label}</p>
+            <p className="mt-2 text-2xl font-semibold">{metric.value}</p>
+          </article>
+        ))}
       </div>
+
+      <section className="rounded-lg border border-slate-200 bg-white p-5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">Pipeline por etapa</h2>
+          <Link className="text-sm text-blue-700 underline" href="/pipeline">Ver pipeline</Link>
+        </div>
+        {dashboard.stages.length > 0 ? (
+          <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {dashboard.stages.map(({ etapa, _count }) => (
+              <li className="rounded-md bg-slate-50 p-3" key={etapa}>
+                <span>{opportunityStageLabels[etapa]}</span>
+                <strong className="float-right">{_count._all}</strong>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-3 text-sm text-slate-600">No hay oportunidades en el pipeline.</p>
+        )}
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-lg border border-slate-200 bg-white p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold">Pipeline abierto</h2>
-            <p className="font-semibold">{formatClp(metrics.pipelineValue)}</p>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">Actividades de hoy</h2>
+            <Link className="text-sm text-blue-700 underline" href="/actividades?periodo=hoy">Ver actividades</Link>
           </div>
-          <ul className="mt-4 grid gap-2 sm:grid-cols-2">
-            {Object.entries(opportunityStageLabels)
-              .filter(([stage]) => !["ganado", "perdido"].includes(stage))
-              .map(([stage, label]) => (
-                <li className="flex justify-between rounded-md bg-slate-50 px-3 py-2 text-sm" key={stage}>
-                  <span>{label}</span>
-                  <span className="font-medium">{stageCounts.get(stage as keyof typeof opportunityStageLabels) ?? 0}</span>
-                </li>
-              ))}
-          </ul>
-        </section>
-
-        <section className="rounded-lg border border-red-200 bg-white p-5">
-          <h2 className="text-lg font-semibold">Actividades críticas</h2>
-          {metrics.criticalActivities.length === 0 ? (
-            <p className="mt-3 text-sm text-slate-600">No hay actividades críticas pendientes.</p>
-          ) : (
-            <ul className="mt-3 divide-y divide-slate-100">
-              {metrics.criticalActivities.map((activity) => (
+          {dashboard.activitiesToday.length > 0 ? (
+            <ul className="mt-4 divide-y divide-slate-100">
+              {dashboard.activitiesToday.map((activity) => (
                 <li className="py-3" key={activity.id}>
-                  <Link className="font-medium text-blue-700 underline" href="/actividades">
-                    {activity.asunto}
+                  <Link className="font-medium text-blue-700 underline" href={`/clientes/${activity.cliente.id}`}>
+                    {activity.asunto} · {activity.cliente.nombre}
                   </Link>
-                  <p className="mt-1 text-xs text-slate-600">
-                    {activity.cliente.nombre} · {activityTypeLabels[activity.tipo]} · {formatDateTime(activity.fechaHora)} · {activityPriorityLabels[activity.prioridad]}
+                  <p className="mt-1 text-sm text-slate-600">
+                    {activityTypeLabels[activity.tipo]} · {formatDateTime(activity.fechaHora)}
                   </p>
                 </li>
               ))}
             </ul>
+          ) : (
+            <p className="mt-3 text-sm text-slate-600">No hay actividades pendientes para hoy.</p>
+          )}
+        </section>
+
+        <section className="rounded-lg border border-slate-200 bg-white p-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">Seguimientos vencidos</h2>
+            <Link className="text-sm text-blue-700 underline" href="/actividades?periodo=vencidas">Revisar vencidas</Link>
+          </div>
+          {dashboard.overdueActivities.length > 0 ? (
+            <ul className="mt-4 divide-y divide-slate-100">
+              {dashboard.overdueActivities.map((activity) => (
+                <li className="py-3" key={activity.id}>
+                  <Link className="font-medium text-blue-700 underline" href={`/clientes/${activity.cliente.id}`}>
+                    {activity.asunto} · {activity.cliente.nombre}
+                  </Link>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {activityTypeLabels[activity.tipo]} · {formatDateTime(activity.fechaHora)} · {activityPriorityLabels[activity.prioridad]}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-sm text-slate-600">No hay actividades vencidas.</p>
           )}
         </section>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <ActivityList title="Actividades de hoy" activities={metrics.activitiesToday} />
-        <ActivityList title="Actividades vencidas" activities={metrics.overdueActivities} />
-      </div>
-    </section>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  href,
-}: {
-  label: string;
-  value: number;
-  href: string;
-}) {
-  return (
-    <Link className="rounded-lg border border-slate-200 bg-white p-5 transition hover:border-slate-400" href={href}>
-      <p className="text-sm text-slate-600">{label}</p>
-      <p className="mt-2 text-3xl font-semibold">{value}</p>
-    </Link>
-  );
-}
-
-function ActivityList({
-  title,
-  activities,
-}: {
-  title: string;
-  activities: Awaited<ReturnType<typeof getCommercialDashboard>>["activitiesToday"];
-}) {
-  return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      {activities.length === 0 ? (
-        <p className="mt-3 text-sm text-slate-600">No hay actividades para mostrar.</p>
-      ) : (
-        <ul className="mt-3 divide-y divide-slate-100">
-          {activities.map((activity) => (
-            <li className="py-3" key={activity.id}>
-              <Link className="font-medium text-blue-700 underline" href={`/actividades?clienteId=${activity.clienteId}`}>
-                {activity.asunto}
-              </Link>
-              <p className="mt-1 text-xs text-slate-600">
-                {activity.cliente.nombre} · {activityTypeLabels[activity.tipo]} · {formatDateTime(activity.fechaHora)}
-              </p>
-            </li>
-          ))}
-        </ul>
-      )}
+      {dashboard.criticalActivities.length > 0 ? (
+        <section className="rounded-lg border border-red-200 bg-red-50 p-5">
+          <h2 className="text-lg font-semibold text-red-900">Actividades críticas pendientes</h2>
+          <ul className="mt-3 list-inside list-disc text-sm text-red-900">
+            {dashboard.criticalActivities.map((activity) => (
+              <li key={activity.id}>
+                <Link className="underline" href={`/clientes/${activity.cliente.id}`}>
+                  {activity.asunto} · {activity.cliente.nombre}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </section>
   );
 }

@@ -13,3 +13,17 @@ const transitions: Record<OpportunityStage, readonly OpportunityStage[]> = {
 export function getNextOpportunityStages(stage: OpportunityStage) {
   return transitions[stage];
 }
+
+export function getOpportunityStageAfterQuoteSent(
+  stage: OpportunityStage,
+): OpportunityStage | null {
+  if (stage === "nuevo" || stage === "contactado" || stage === "visita_agendada") {
+    return "cotizado";
+  }
+
+  if (stage === "cotizado" || stage === "negociacion") {
+    return stage;
+  }
+
+  return null;
+}

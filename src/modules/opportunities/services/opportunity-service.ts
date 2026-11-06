@@ -50,7 +50,13 @@ export async function editOpportunity(id: string, input: OpportunityInput) {
     throw new AppError("No se puede editar una oportunidad cerrada.", 409);
   }
 
-  return updateOpportunity(id, input);
+  const result = await updateOpportunity(id, existing.etapa, input);
+
+  if (result !== 1) {
+    throw new AppError("La oportunidad cambió. Actualiza la página e inténtalo nuevamente.", 409);
+  }
+
+  return true;
 }
 
 export async function searchPipeline(filters: OpportunityFilters) {

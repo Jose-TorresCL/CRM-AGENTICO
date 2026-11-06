@@ -46,9 +46,15 @@ export async function createActivity(data: ActivityInput) {
 
 export async function updateActivity(
   id: string,
+  expectedStatus: "pendiente" | "en_curso",
   data: Prisma.ActivityUncheckedUpdateInput,
 ) {
-  return getPrismaClient().activity.update({ where: { id }, data });
+  const result = await getPrismaClient().activity.updateMany({
+    where: { id, estado: expectedStatus },
+    data,
+  });
+
+  return result.count;
 }
 
 export async function transitionActivityStatus(

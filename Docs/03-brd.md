@@ -5,8 +5,8 @@
 | Campo | Valor |
 |---|---|
 | Proyecto | CRM Operativo para Revestimiento de Piscinas |
-| Versión | 1.0 |
-| Estado | Aprobado |
+| Versión | 1.1 |
+| Estado | Aprobado; decisiones de Fase 3 confirmadas |
 | Alcance | MVP |
 | Audiencia | Equipo de desarrollo, QA y producto |
 
@@ -64,6 +64,11 @@ Reducir la dependencia operativa del dueño.
 - Integración contable.
 - App nativa.
 - Multiempresa.
+
+El alcance general del MVP está secuenciado por fases. La implementación actual
+de Fase 3 se limita a cotizaciones y al registro inicial de obra descrito en
+este documento; obras operativas, cuadrillas, planificación y finanzas quedan
+para fases posteriores.
 
 ## 4. Entidades
 
@@ -124,14 +129,16 @@ Representa la propuesta comercial.
 Campos mínimos:
 
 - id
-- numero
+- numero único anual (`QUO-AAAA-000001`)
 - oportunidad_id
 - cliente_id
 - fecha_emision
 - fecha_vencimiento
 - estado
+- alcance
 - tipo_revestimiento
 - superficie_estimada
+- unidad_superficie
 - precio_total
 - costo_estimado
 - margen_estimado
@@ -139,9 +146,13 @@ Campos mínimos:
 - plazo_estimado_dias
 - condiciones
 - exclusiones
-- documento_url
+- registro de envío y sus actores/fechas
 - fecha_aprobacion
 - motivo_rechazo
+- motivo_anulacion
+
+El PDF se genera al descargar y no se conserva como adjunto ni se transmite
+desde el sistema.
 
 Estados:
 
@@ -159,27 +170,25 @@ Representa el trabajo aprobado.
 Campos mínimos:
 
 - id
-- codigo
 - cotizacion_id
 - cliente_id
 - direccion
 - comuna
 - estado
-- fecha_inicio_comprometida
-- fecha_termino_estimada
-- fecha_inicio_real
-- fecha_termino_real
-- valor_contratado
-- anticipo_recibido
-- adicionales_aprobados
-- costo_real_estimado
-- saldo_pendiente
-- responsable_operativo_id
+- alcance aprobado
 - tipo_revestimiento
-- superficie
-- materiales_principales
-- observaciones
-- garantia_hasta
+- superficie y unidad
+- valor_contratado
+- costo y margen estimados como snapshot comercial
+- anticipo_requerido (condición; no dinero recibido)
+- plazo_estimado_dias_habiles
+- condiciones y exclusiones aprobadas
+
+En Fase 3, la obra inicial solo se crea desde una cotización aprobada y queda
+en estado `programada`. Se solicita y confirma dirección y comuna al convertir.
+No se inventan código de obra, fechas de planificación ni responsable
+operativo. Fechas de planificación, responsable operativo, cuadrillas,
+ejecución, pagos y cobranza pertenecen a fases posteriores.
 
 Estados:
 
@@ -191,6 +200,9 @@ Estados:
 - cobrada
 - cerrada
 - cancelada
+
+Fase 3 implementa únicamente `programada`; los demás estados operativos se
+reservan para fases posteriores.
 
 ### Cuadrilla
 
@@ -309,16 +321,22 @@ Estados:
 1. Abrir oportunidad.
 2. Crear cotización en borrador.
 3. Ingresar precio, costo, anticipo y plazo.
-4. Calcular margen.
-5. Enviar cotización.
-6. Crear seguimiento.
+4. Calcular margen estimado bruto en servidor.
+5. Descargar el PDF si corresponde y registrar manualmente el envío.
+6. El sistema no envía correo ni mensajería.
 
 ### CU-04 — Aprobar cotización y crear obra
 
 1. Aprobar cotización.
-2. Crear obra desde cotización.
-3. Heredar datos comerciales y técnicos.
-4. Crear actividad para cobrar anticipo.
+2. La oportunidad se marca ganada en la misma transacción.
+3. Las otras propuestas abiertas de esa oportunidad se anulan con motivo y
+   auditoría.
+4. Confirmar dirección y comuna y crear manualmente el registro inicial de obra
+   en estado `programada`.
+5. Heredar el snapshot comercial aprobado.
+
+La creación de obra no registra anticipos recibidos, pagos ni actividades de
+cobranza; esos flujos no pertenecen a Fase 3.
 
 ### CU-05 — Registrar anticipo
 
@@ -388,10 +406,13 @@ margen_estimado = precio_total - costo_estimado
 Solo una cotización en estado aprobada puede generar obra.
 
 ### RN-07
-Una cotización vencida no puede aprobarse sin regeneración o extensión explícita.
+La fecha de vencimiento es inclusiva hasta las 23:59 de `America/Santiago`.
+Una acción de aprobación posterior registra la cotización como vencida y la
+rechaza; se debe crear una nueva propuesta para continuar.
 
 ### RN-08
-Toda obra debe estar asociada a un cliente y a una cotización aprobada, salvo excepción autorizada.
+Toda obra inicial de Fase 3 debe estar asociada a un cliente y a una cotización
+aprobada; no existe excepción de conversión en esta fase.
 
 ### RN-09
 Una obra no puede pasar a ejecución sin anticipo registrado, salvo autorización explícita.
@@ -420,6 +441,37 @@ No se permite borrado físico de registros comerciales o financieros.
 
 ### RN-15
 Las transiciones de estado deben validarse en el backend.
+
+### Decisiones confirmadas para Fase 3
+
+- Los importes se expresan en CLP y precio/costo son montos brutos con IVA. El
+  margen se calcula como `precio_total - costo_estimado`; es una estimación
+  comercial bruta, no utilidad neta contable.
+- El anticipo requerido es un monto fijo en CLP entre cero y el precio total.
+  Es una condición de la cotización, no un pago recibido.
+- La numeración es anual y secuencial: `QUO-AAAA-000001`.
+- “Enviar” solo registra fecha y actor de forma manual. El PDF se genera para
+  descarga; no hay correo, WhatsApp, mensajería ni archivo asociado en Storage.
+- Un borrador se puede editar. Una cotización enviada es inmutable; los cambios
+  requieren un nuevo borrador y la anterior puede anularse con motivo. No hay
+  borrado físico.
+- Owner y sales pueden crear, editar borradores, registrar envío, aprobar,
+  rechazar, anular, vencer y convertir. Operations, finance, crew_leader y
+  viewer mantienen lectura solamente en cotizaciones y obras iniciales.
+- Una oportunidad puede tener varias propuestas, pero solo una puede aprobarse.
+  La aprobación marca la oportunidad ganada y anula automáticamente las demás
+  cotizaciones en borrador o enviadas, con motivo y auditoría. Rechazar una
+  propuesta no cambia la etapa/estado de la oportunidad.
+- La excepción existente para que solo owner gane una oportunidad sin
+  cotización aprobada se conserva sin cambios y mantiene su auditoría.
+- La obra inicial requiere dirección y comuna confirmadas; conserva alcance,
+  tipo, superficie, valores comerciales, anticipo requerido, plazo y condiciones
+  aprobadas. No requiere fecha de inicio ni responsable operativo en esta fase.
+- La conversión es transaccional y una cotización solo puede generar una obra.
+  Los valores aprobados y el snapshot comercial de la obra son inmutables.
+- Esta fase no implementa planificación, cuadrillas, asignaciones, avances,
+  incidencias, cambios de alcance operacionales, pagos, anticipos recibidos,
+  saldos ni cobranza.
 
 ## 7. Pantallas
 

@@ -7,7 +7,10 @@ import type {
   OpportunitySource,
   OpportunityStage,
   OpportunityStatus,
+  QuoteStatus,
+  QuoteSurfaceUnit,
   ServiceType,
+  WorkStatus,
 } from "@/generated/prisma/enums";
 
 export const clientTypeLabels: Record<ClientType, string> = {
@@ -81,4 +84,22 @@ export const activityPriorityLabels: Record<ActivityPriority, string> = {
   media: "Media",
   alta: "Alta",
   critica: "Crítica",
+};
+
+export const quoteStatusLabels: Record<QuoteStatus, string> = {
+  borrador: "Borrador",
+  enviada: "Enviada",
+  aprobada: "Aprobada",
+  rechazada: "Rechazada",
+  vencida: "Vencida",
+  anulada: "Anulada",
+};
+
+export const quoteSurfaceUnitLabels: Record<QuoteSurfaceUnit, string> = {
+  m2: "m²",
+  unidad: "Unidad",
+};
+
+export const workStatusLabels: Record<WorkStatus, string> = {
+  programada: "Programada",
 };

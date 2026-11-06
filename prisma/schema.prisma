@@ -109,6 +109,30 @@ enum ActivityPriority {
   @@map("activity_priority")
 }
 
+enum QuoteStatus {
+  borrador
+  enviada
+  aprobada
+  rechazada
+  vencida
+  anulada
+
+  @@map("quote_status")
+}
+
+enum QuoteSurfaceUnit {
+  m2
+  unidad
+
+  @@map("quote_surface_unit")
+}
+
+enum WorkStatus {
+  programada
+
+  @@map("work_status")
+}
+
 model User {
   id            String               @id @db.Uuid
   createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -117,6 +141,14 @@ model User {
   auditLogs     AuditLog[]
   opportunities Opportunity[]        @relation("OpportunityResponsible")
   activities    Activity[]           @relation("ActivityResponsible")
+  quotesCreated Quote[]              @relation("QuoteCreatedBy")
+  quotesUpdated Quote[]              @relation("QuoteUpdatedBy")
+  quotesSent    Quote[]              @relation("QuoteSentBy")
+  quotesApproved Quote[]             @relation("QuoteApprovedBy")
+  quotesRejected Quote[]             @relation("QuoteRejectedBy")
+  quotesExpired Quote[]              @relation("QuoteExpiredBy")
+  quotesCancelled Quote[]            @relation("QuoteCancelledBy")
+  worksCreated  Work[]               @relation("WorkCreatedBy")
 
   @@map("users")
 }
@@ -161,6 +193,8 @@ model Client {
   updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   opportunities Opportunity[]
   activities    Activity[]
+  quotes        Quote[]
+  works         Work[]
 
   @@index([nombre])
   @@index([telefono])
@@ -192,6 +226,7 @@ model Opportunity {
   cliente             Client            @relation(fields: [clienteId], references: [id], onDelete: Restrict)
   responsable         User              @relation("OpportunityResponsible", fields: [responsableId], references: [id], onDelete: Restrict)
   activities          Activity[]
+  quotes              Quote[]
 
   @@index([clienteId])
   @@index([etapa])
@@ -200,6 +235,7 @@ model Opportunity {
   @@index([fechaProximaAccion])
   @@index([origen])
   @@index([comuna])
+  @@unique([id, clienteId], map: "opportunities_id_cliente_id_key")
   @@map("opportunities")
 }
 
@@ -229,4 +265,96 @@ model Activity {
   @@index([tipo])
   @@index([prioridad])
   @@map("activities")
+}
+
+model Quote {
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  numero             String           @unique @db.VarChar(24)
+  oportunidadId      String           @map("oportunidad_id") @db.Uuid
+  clienteId          String           @map("cliente_id") @db.Uuid
+  fechaEmision       DateTime         @default(now()) @map("fecha_emision") @db.Timestamptz(6)
+  fechaVencimiento   DateTime         @map("fecha_vencimiento") @db.Date
+  estado             QuoteStatus      @default(borrador)
+  alcance            String
+  tipoRevestimiento  ServiceType      @map("tipo_revestimiento")
+  superficie         Decimal          @db.Decimal(10, 2)
+  unidadSuperficie   QuoteSurfaceUnit @default(m2) @map("unidad_superficie")
+  precioTotal        Decimal          @map("precio_total") @db.Decimal(14, 0)
+  costoEstimado      Decimal          @map("costo_estimado") @db.Decimal(14, 0)
+  margenEstimado     Decimal          @map("margen_estimado") @db.Decimal(14, 0)
+  anticipoRequerido  Decimal          @map("anticipo_requerido") @db.Decimal(14, 0)
+  plazoDiasHabiles   Int              @map("plazo_dias_habiles")
+  condiciones        String
+  exclusiones        String?
+  enviadaAt          DateTime?        @map("enviada_at") @db.Timestamptz(6)
+  enviadaPorId       String?          @map("enviada_por_id") @db.Uuid
+  aprobadaAt         DateTime?        @map("aprobada_at") @db.Timestamptz(6)
+  aprobadaPorId      String?          @map("aprobada_por_id") @db.Uuid
+  vencidaAt          DateTime?        @map("vencida_at") @db.Timestamptz(6)
+  vencidaPorId       String?          @map("vencida_por_id") @db.Uuid
+  motivoRechazo      String?          @map("motivo_rechazo")
+  rechazadaAt        DateTime?        @map("rechazada_at") @db.Timestamptz(6)
+  rechazadaPorId     String?          @map("rechazada_por_id") @db.Uuid
+  motivoAnulacion    String?          @map("motivo_anulacion")
+  anuladaAt          DateTime?        @map("anulada_at") @db.Timestamptz(6)
+  anuladaPorId       String?          @map("anulada_por_id") @db.Uuid
+  creadaPorId        String           @map("creada_por_id") @db.Uuid
+  actualizadaPorId   String           @map("actualizada_por_id") @db.Uuid
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  oportunidad        Opportunity      @relation(fields: [oportunidadId, clienteId], references: [id, clienteId], onDelete: Restrict)
+  cliente            Client           @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  enviadaPor         User?            @relation("QuoteSentBy", fields: [enviadaPorId], references: [id], onDelete: Restrict)
+  aprobadaPor        User?            @relation("QuoteApprovedBy", fields: [aprobadaPorId], references: [id], onDelete: Restrict)
+  vencidaPor         User?            @relation("QuoteExpiredBy", fields: [vencidaPorId], references: [id], onDelete: Restrict)
+  rechazadaPor       User?            @relation("QuoteRejectedBy", fields: [rechazadaPorId], references: [id], onDelete: Restrict)
+  anuladaPor         User?            @relation("QuoteCancelledBy", fields: [anuladaPorId], references: [id], onDelete: Restrict)
+  creadaPor          User             @relation("QuoteCreatedBy", fields: [creadaPorId], references: [id], onDelete: Restrict)
+  actualizadaPor     User             @relation("QuoteUpdatedBy", fields: [actualizadaPorId], references: [id], onDelete: Restrict)
+  obra               Work?
+
+  @@unique([id, clienteId], map: "quotes_id_cliente_id_key")
+  @@index([oportunidadId, estado, createdAt])
+  @@index([clienteId, createdAt])
+  @@index([estado, fechaVencimiento])
+  @@map("quotes")
+}
+
+model QuoteNumberCounter {
+  year      Int      @id
+  lastValue Int      @map("last_value")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("quote_number_counters")
+}
+
+model Work {
+  id                     String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  quoteId                String           @unique @map("quote_id") @db.Uuid
+  clienteId              String           @map("cliente_id") @db.Uuid
+  estado                 WorkStatus       @default(programada)
+  direccion              String           @db.VarChar(240)
+  comuna                 String           @db.VarChar(120)
+  alcance                String
+  tipoRevestimiento      ServiceType      @map("tipo_revestimiento")
+  superficie             Decimal          @db.Decimal(10, 2)
+  unidadSuperficie       QuoteSurfaceUnit @default(m2) @map("unidad_superficie")
+  precioContratado       Decimal          @map("precio_contratado") @db.Decimal(14, 0)
+  costoEstimadoSnapshot  Decimal          @map("costo_estimado_snapshot") @db.Decimal(14, 0)
+  margenEstimadoSnapshot Decimal          @map("margen_estimado_snapshot") @db.Decimal(14, 0)
+  anticipoRequerido      Decimal          @map("anticipo_requerido") @db.Decimal(14, 0)
+  plazoDiasHabiles       Int              @map("plazo_dias_habiles")
+  condiciones            String
+  exclusiones            String?
+  creadaPorId             String           @map("creada_por_id") @db.Uuid
+  createdAt               DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  quote                   Quote            @relation(fields: [quoteId, clienteId], references: [id, clienteId], onDelete: Restrict)
+  cliente                 Client           @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  creadaPor               User             @relation("WorkCreatedBy", fields: [creadaPorId], references: [id], onDelete: Restrict)
+
+  @@unique([quoteId, clienteId], map: "works_quote_id_cliente_id_key")
+  @@index([clienteId, createdAt])
+  @@index([estado])
+  @@map("works")
 }

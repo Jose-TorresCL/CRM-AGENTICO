@@ -49,7 +49,13 @@ export async function editActivity(id: string, input: ActivityInput) {
   }
 
   await ensureOpportunityBelongsToClient(input.oportunidadId, input.clienteId);
-  return updateActivity(id, input);
+  const result = await updateActivity(id, existing.estado, input);
+
+  if (result !== 1) {
+    throw new AppError("La actividad cambió. Actualiza la página e inténtalo nuevamente.", 409);
+  }
+
+  return true;
 }
 
 type ActivityCompletion = z.infer<typeof completeActivitySchema>;

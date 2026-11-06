@@ -69,8 +69,17 @@ export async function createOpportunity(data: OpportunityInput) {
   return getPrismaClient().opportunity.create({ data });
 }
 
-export async function updateOpportunity(id: string, data: OpportunityInput) {
-  return getPrismaClient().opportunity.update({ where: { id }, data });
+export async function updateOpportunity(
+  id: string,
+  expectedStage: OpportunityStage,
+  data: OpportunityInput,
+) {
+  const result = await getPrismaClient().opportunity.updateMany({
+    where: { id, etapa: expectedStage, estado: "abierta" },
+    data,
+  });
+
+  return result.count;
 }
 
 export async function cancelOpportunityRecord(

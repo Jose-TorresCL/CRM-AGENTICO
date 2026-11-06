@@ -41,6 +41,14 @@ export const clientWriteRoles = ["owner", "sales"] as const satisfies readonly U
 export const opportunityReadRoles = clientReadRoles;
 export const opportunityWriteRoles = clientWriteRoles;
 
+export const quoteReadRoles = [
+  ...clientReadRoles,
+  "crew_leader",
+] as const satisfies readonly UserRole[];
+export const quoteWriteRoles = ["owner", "sales"] as const satisfies readonly UserRole[];
+
+export const workReadRoles = quoteReadRoles;
+
 export const activityReadRoles = clientReadRoles;
 export const activityWriteRoles = [
   "owner",

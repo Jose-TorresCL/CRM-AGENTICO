@@ -8,8 +8,9 @@ import { clientReadRoles, hasAnyRole, opportunityWriteRoles, requireRoles } from
 import { findOpportunity } from "@/modules/opportunities/services/opportunity-service";
 import { searchClients } from "@/modules/clients/services/client-service";
 import { listOpportunitiesForClient } from "@/modules/opportunities/services/opportunity-service";
-import { activityStatusLabels, activityTypeLabels, opportunitySourceLabels, opportunityStageLabels, opportunityStatusLabels, serviceTypeLabels } from "@/shared/constants/crm-labels";
-import { formatClp, formatDateTime } from "@/shared/lib/chile-datetime";
+import { findQuotesForOpportunity } from "@/modules/quotes/services/quote-service";
+import { activityStatusLabels, activityTypeLabels, opportunitySourceLabels, opportunityStageLabels, opportunityStatusLabels, quoteStatusLabels, serviceTypeLabels } from "@/shared/constants/crm-labels";
+import { formatClp, formatDateOnly, formatDateTime } from "@/shared/lib/chile-datetime";
 import { parseRouteId } from "@/shared/validations/route-params";
 
 type OpportunityDetailProps = { params: Promise<{ id: string }> };
@@ -29,6 +30,7 @@ export default async function OpportunityDetailPage({ params }: OpportunityDetai
     ? await Promise.all([searchClients({}), getAssignableUserOptions()])
     : [[], []];
   const activityOpportunities = await listOpportunitiesForClient(opportunity.clienteId);
+  const quotes = await findQuotesForOpportunity(opportunity.id);
 
   return (
     <section className="space-y-7">
@@ -59,6 +61,41 @@ export default async function OpportunityDetailPage({ params }: OpportunityDetai
             {opportunity.motivoPerdida ? <p className="sm:col-span-2"><span className="text-sm text-slate-500">Motivo de pérdida</span><br />{opportunity.motivoPerdida}</p> : null}
             {opportunity.motivoCancelacion ? <p className="sm:col-span-2"><span className="text-sm text-slate-500">Motivo de cancelación</span><br />{opportunity.motivoCancelacion}</p> : null}
             {opportunity.notas ? <p className="sm:col-span-2"><span className="text-sm text-slate-500">Notas</span><br />{opportunity.notas}</p> : null}
+          </section>
+
+          <section className="rounded-lg border border-slate-200 bg-white p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold">Cotizaciones</h2>
+              {canWrite && opportunity.estado === "abierta" ? (
+                <Link
+                  className="text-sm text-blue-700 underline"
+                  href={`/cotizaciones/nueva?oportunidadId=${opportunity.id}`}
+                >
+                  Crear cotización
+                </Link>
+              ) : null}
+            </div>
+            {quotes.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-600">No hay cotizaciones asociadas.</p>
+            ) : (
+              <ul className="mt-4 divide-y divide-slate-100">
+                {quotes.map((quote) => (
+                  <li className="py-3" key={quote.id}>
+                    <Link className="font-medium text-blue-700 underline" href={`/cotizaciones/${quote.id}`}>
+                      {quote.numero} · {quoteStatusLabels[quote.estado]}
+                    </Link>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Precio bruto: {formatClp(quote.precioTotal)} · Margen estimado bruto: {formatClp(quote.margenEstimado)} · Vence: {formatDateOnly(quote.fechaVencimiento)}
+                    </p>
+                    {quote.obra ? (
+                      <Link className="mt-1 inline-block text-xs text-blue-700 underline" href={`/obras/${quote.obra.id}`}>
+                        Ver obra creada
+                      </Link>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
           <section className="rounded-lg border border-slate-200 bg-white p-5">

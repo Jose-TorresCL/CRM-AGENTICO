@@ -76,6 +76,24 @@ Actividad ↔ Obra
 - App nativa.
 - Multiempresa.
 
+## 6.1 Alcance por fase — Fase 3
+
+La implementación autorizada de Fase 3 cubre únicamente:
+
+- Cotizaciones desde oportunidades abiertas, con borrador editable, envío
+  registrado manualmente, aprobación, rechazo, vencimiento y anulación.
+- Una cotización puede tener un PDF descargable generado por el sistema; no se
+  almacena como adjunto ni se envía por correo o mensajería.
+- Conversión manual de una cotización aprobada a un registro inicial de obra en
+  estado `programada`.
+- La obra inicial conserva la ubicación confirmada y los valores/condiciones de
+  la cotización aprobada.
+
+Quedan para fases posteriores la planificación, fechas de ejecución, cuadrillas,
+asignaciones, avances, incidencias, cambios de alcance operacionales, anticipos
+recibidos, pagos, saldos y cobranza. El anticipo requerido de una cotización es
+solo una condición comercial.
+
 ## 7. Reglas esenciales
 
 1. Toda oportunidad debe pertenecer a un cliente.
@@ -88,6 +106,14 @@ Actividad ↔ Obra
 8. El saldo pendiente debe calcularse automáticamente.
 9. No se permite borrado físico de información comercial o financiera.
 10. Las transiciones de estado deben validarse en el backend.
+11. Una oportunidad puede tener varias cotizaciones; solo una puede aprobarse.
+    Al aprobar una, las otras cotizaciones abiertas de esa oportunidad se
+    anulan con motivo y auditoría.
+12. Precio y costo se registran como montos brutos en CLP, ambos con IVA. El
+    margen es su diferencia y solo una estimación comercial, no utilidad neta
+    contable.
+13. Una cotización aprobada y la ficha comercial de la obra inicial no pueden
+    alterarse silenciosamente.
 
 ## 8. Definición de listo
 
